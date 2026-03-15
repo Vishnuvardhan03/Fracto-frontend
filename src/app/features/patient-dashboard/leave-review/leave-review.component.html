@@ -1,0 +1,53 @@
+<div class="review-wrapper">
+  <div class="glass-panel review-card">
+    <div class="header">
+      <h2>Leave a Review</h2>
+      <p class="subtitle">Rate your recent visit with {{ doctorName }}</p>
+    </div>
+
+    <form [formGroup]="reviewForm" (ngSubmit)="onSubmit()" class="review-form">
+      <!-- Star Rating Section -->
+      <div class="rating-section">
+        <label>Overall Rating</label>
+        <div class="stars-container" (mouseleave)="setHover(0)">
+          <span 
+            *ngFor="let star of stars" 
+            class="star-btn"
+            [class.active]="star <= (hoveredStar || reviewForm.get('rating')?.value)"
+            (mouseenter)="setHover(star)"
+            (click)="setRating(star)"
+          >
+            ★
+          </span>
+        </div>
+        <div class="error-msg" *ngIf="reviewForm.get('rating')?.hasError('min') && reviewForm.get('rating')?.touched">
+          Please select a rating.
+        </div>
+      </div>
+
+      <!-- Comment Section -->
+      <div class="form-group">
+        <label for="comment">Your Feedback</label>
+        <textarea 
+          id="comment" 
+          formControlName="comment" 
+          placeholder="Please share your experience (minimum 10 characters)..."
+          rows="5"
+        ></textarea>
+        
+        <div class="error-msg" *ngIf="reviewForm.get('comment')?.hasError('required') && reviewForm.get('comment')?.touched">
+          Feedback is required.
+        </div>
+        <div class="error-msg" *ngIf="reviewForm.get('comment')?.hasError('minlength') && reviewForm.get('comment')?.touched">
+          Feedback must be at least 10 characters.
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="actions">
+        <button type="button" class="btn-secondary" (click)="cancel()">Cancel</button>
+        <button type="submit" class="btn-primary" [disabled]="reviewForm.invalid && reviewForm.touched">Submit Review</button>
+      </div>
+    </form>
+  </div>
+</div>

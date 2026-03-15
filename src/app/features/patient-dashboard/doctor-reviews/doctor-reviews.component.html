@@ -1,0 +1,53 @@
+<div class="reviews-container">
+  <div class="doctor-summary glass-panel">
+    <div class="doc-info">
+      <div class="doc-avatar">
+        {{ doctorName.charAt(4) }}
+      </div>
+      <div class="doc-details">
+        <h2>{{ doctorName }}</h2>
+        <p class="specialty">{{ specialty }}</p>
+      </div>
+    </div>
+    
+    <div class="rating-summary">
+      <div class="avg-rating">
+        <span class="score">{{ averageRating }}</span>
+        <span class="star-icon">★</span>
+      </div>
+      <p class="total-reviews">Based on {{ totalReviews }} reviews</p>
+    </div>
+  </div>
+
+  <div class="reviews-list">
+    <h3 class="list-title">Patient Reviews</h3>
+    
+    <div *ngIf="reviews.length === 0" class="empty-state">
+      <p>No reviews available for this doctor yet.</p>
+    </div>
+
+    <div *ngFor="let review of reviews" class="review-card glass-panel">
+      <div class="review-header">
+        <div class="reviewer-info">
+          <div class="reviewer-avatar">
+            {{ review.patientName?.charAt(0) || 'A' }}
+          </div>
+          <div>
+            <h4 class="reviewer-name">{{ review.patientName || 'Anonymous' }}</h4>
+            <span class="review-date">{{ review.createdAt | date:'mediumDate' }}</span>
+          </div>
+        </div>
+        
+        <div class="review-stars">
+          <span *ngFor="let star of getStarsArray(5)" class="star" [class.filled]="star <= review.rating">
+            ★
+          </span>
+        </div>
+      </div>
+      
+      <div class="review-body">
+        <p>{{ review.comment }}</p>
+      </div>
+    </div>
+  </div>
+</div>
