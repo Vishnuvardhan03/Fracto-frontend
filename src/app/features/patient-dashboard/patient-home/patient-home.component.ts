@@ -1,4 +1,4 @@
-import { Component, OnInit, PLATFORM_ID, Inject } from '@angular/core';
+import { Component, OnInit, PLATFORM_ID, Inject, inject, ChangeDetectorRef } from '@angular/core';
 import { isPlatformBrowser, CommonModule, DatePipe } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -405,6 +405,7 @@ import { AuthService } from '../../../core/auth/auth.service';
   `]
 })
 export class PatientHomeComponent implements OnInit {
+  private cdr = inject(ChangeDetectorRef);
   tab: 'home' | 'book' | 'appts' = 'home';
 
   // Data
@@ -488,9 +489,10 @@ export class PatientHomeComponent implements OnInit {
       const u = JSON.parse(raw);
       if (u.userId) {
         this.userService.getProfile(u.userId).subscribe({
-          next: (p) => this.userProfile = p,
+          next: (p) => { this.userProfile = p; this.cdr.detectChanges(); },
           error: () => { /* set a minimal profile from localStorage so name still shows */
             this.userProfile = { userId: u.userId, firstName: u.firstName, lastName: u.lastName, email: u.email, phone: '', role: u.role, isEmailVerified: true };
+            this.cdr.detectChanges();
           }
         });
       }
@@ -500,15 +502,15 @@ export class PatientHomeComponent implements OnInit {
   loadAppointments() {
     this.loadingAppts = true;
     this.appointmentService.getUserAppointments().subscribe({
-      next: (data) => { this.appointments = data || []; this.loadingAppts = false; },
-      error: () => { this.loadingAppts = false; }
+      next: (data) => { this.appointments = data || []; this.loadingAppts = false; this.cdr.detectChanges(); },
+      error: () => { this.loadingAppts = false; this.cdr.detectChanges(); }
     });
   }
 
   loadSpecializations() {
     this.doctorService.getSpecializations().subscribe({
-      next: (data) => { if (data?.length) this.specializations = data; },
-      error: () => { /* keep static fallback */ }
+      next: (data) => { if (data?.length) this.specializations = data; this.cdr.detectChanges(); },
+      error: () => { this.cdr.detectChanges(); /* keep static fallback */ }
     });
   }
 
@@ -525,10 +527,12 @@ export class PatientHomeComponent implements OnInit {
         this.initBookingData();
         this.loadingDoctors = false;
         this.doctorsLoaded = true;
+        this.cdr.detectChanges();
       },
       error: () => {
         this.loadingDoctors = false;
         this.doctorsLoaded = true;
+        this.cdr.detectChanges();
       }
     });
   }
@@ -573,11 +577,13 @@ export class PatientHomeComponent implements OnInit {
         this.bookingData[doctorId] = { date: '', time: '' };
         this.loadAppointments();
         this.tab = 'appts';
+        this.cdr.detectChanges();
       },
       error: (err) => {
         this.isBooking[doctorId] = false;
         const msg = err?.response?.data?.message || err?.error?.message || 'Booking failed. Try again.';
         this.bookingError[doctorId] = msg;
+        this.cdr.detectChanges();
       }
     });
   }
@@ -585,8 +591,8 @@ export class PatientHomeComponent implements OnInit {
   cancelAppointment(id: number) {
     if (!confirm('Cancel this appointment?')) return;
     this.appointmentService.cancelAppointment(id).subscribe({
-      next: () => this.loadAppointments(),
-      error: (err) => alert(err?.response?.data?.message || 'Could not cancel.')
+      next: () => { this.loadAppointments(); this.cdr.detectChanges(); },
+      error: (err) => { alert(err?.response?.data?.message || 'Could not cancel.'); this.cdr.detectChanges(); }
     });
   }
 
