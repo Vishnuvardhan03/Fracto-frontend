@@ -1,23 +1,18 @@
-import { Injectable, PLATFORM_ID, Inject } from '@angular/core';
-import { isPlatformBrowser } from '@angular/common';
+import { Injectable } from '@angular/core';
 import { Observable, from } from 'rxjs';
-import axios from 'axios';
+import { api } from '../axios.setup';
 import { UserProfile } from '../models/api.model';
 
 @Injectable({
   providedIn: 'root'
 })
 export class UserService {
-  private apiUrl = 'http://localhost:5209/api/user';
-  private isBrowser: boolean;
-
-  constructor(@Inject(PLATFORM_ID) platformId: Object) {
-    this.isBrowser = isPlatformBrowser(platformId);
+  
+  getProfile(userId: number): Observable<UserProfile> {
+    return from(api.get<UserProfile>(`/user/profile/${userId}`).then(res => res.data));
   }
 
-  getProfile(userId: number): Observable<UserProfile> {
-    const token = this.isBrowser ? localStorage.getItem('accessToken') : null;
-    const headers = { Authorization: `Bearer ${token}` };
-    return from(axios.get<UserProfile>(`${this.apiUrl}/profile/${userId}`, { headers }).then(res => res.data));
+  updateProfile(data: Partial<UserProfile>): Observable<any> {
+    return from(api.put(`/user/profile`, data).then(res => res.data));
   }
 }

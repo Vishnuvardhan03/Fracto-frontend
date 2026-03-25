@@ -1,6 +1,8 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { ActivatedRoute } from '@angular/router';
 import { Review } from '../../../core/models/review.model';
+import { ReviewService } from '../../../core/services/review.service';
 
 @Component({
   selector: 'app-doctor-reviews',
@@ -10,44 +12,49 @@ import { Review } from '../../../core/models/review.model';
   styleUrls: ['./doctor-reviews.component.css']
 })
 export class DoctorReviewsComponent implements OnInit {
-  doctorName = 'Dr. Sarah Jenkins';
-  specialty = 'Cardiologist';
-  averageRating = 4.8;
-  totalReviews = 124;
+  private route = inject(ActivatedRoute);
+  private reviewService = inject(ReviewService);
 
-  reviews: Review[] = [
-    {
-      id: 'rev-1',
-      patientId: 'pat-001',
-      patientName: 'Alice Smith',
-      doctorId: 'doc-123',
-      rating: 5,
-      comment: 'Excellent doctor! Very attentive and explained everything clearly. I highly recommend Dr. Jenkins.',
-      createdAt: new Date('2026-03-10T10:30:00Z')
-    },
-    {
-      id: 'rev-2',
-      patientId: 'pat-002',
-      patientName: 'John Doe',
-      doctorId: 'doc-123',
-      rating: 4,
-      comment: 'Good experience overall. Only waited 10 minutes past my appointment time. Friendly staff.',
-      createdAt: new Date('2026-03-05T14:15:00Z')
-    },
-    {
-      id: 'rev-3',
-      patientId: 'pat-003',
-      patientName: 'Anonymous Patient',
-      doctorId: 'doc-123',
-      rating: 5,
-      comment: 'She really takes the time to listen to your concerns. Very empathetic.',
-      createdAt: new Date('2026-02-28T09:00:00Z')
-    }
-  ];
+  doctorId: number | null = null;
+  doctorName = 'Selected Doctor'; // Would ideally sync with Doctor fetch
+  specialty = 'Specialist';
+  averageRating = 0;
+  totalReviews = 0;
 
-  constructor() { }
+  reviews: Review[] = [];
+  isLoading = false;
+  error = '';
 
   ngOnInit(): void {
+    this.route.queryParams.subscribe(params => {
+      const id = params['doctorId'];
+      if (id) {
+        this.doctorId = +id;
+        this.doctorName = params['doctorName'] || 'Doctor';
+        this.loadReviews(this.doctorId);
+      } else {
+        this.error = 'No doctor selected. Please go back and select a doctor to view reviews.';
+      }
+    });
+  }
+
+  loadReviews(doctorId: number) {
+    this.isLoading = true;
+    this.reviewService.getReviewsByDoctor(doctorId).subscribe({
+      next: (data) => {
+        this.reviews = data || [];
+        this.totalReviews = this.reviews.length;
+        if (this.totalReviews > 0) {
+          const sum = this.reviews.reduce((acc, curr) => acc + curr.rating, 0);
+          this.averageRating = sum / this.totalReviews;
+        }
+        this.isLoading = false;
+      },
+      error: (err) => {
+        this.error = 'Failed to load reviews.';
+        this.isLoading = false;
+      }
+    });
   }
 
   getStarsArray(rating: number): number[] {

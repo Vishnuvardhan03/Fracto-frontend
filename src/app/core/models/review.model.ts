@@ -1,11 +1,10 @@
 export interface Review {
-  id?: string;
-  patientId: string;
-  patientName?: string; // Optional for display
-  doctorId: string;
-  doctorName?: string; // Optional for display
-  appointmentId?: string;
+  id?: number;
+  patientId?: number;
+  patientName?: string;
+  doctorId: number;
+  appointmentId?: number;
   rating: number; // 1 to 5
-  comment: string;
-  createdAt: Date;
+  comment?: string;
+  createdAt?: string;
 }

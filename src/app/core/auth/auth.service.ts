@@ -1,7 +1,7 @@
 import { Injectable, PLATFORM_ID, Inject } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
-import { Observable, from, tap } from 'rxjs';
-import axios from 'axios';
+import { Observable, from, tap, of } from 'rxjs';
+import { api } from '../axios.setup';
 import { 
   AuthResponse, 
   InitiateSignupRequest, 
@@ -14,7 +14,6 @@ import {
   providedIn: 'root'
 })
 export class AuthService {
-  private apiUrl = 'http://localhost:5209/api/auth';
   private isBrowser: boolean;
 
   constructor(@Inject(PLATFORM_ID) platformId: Object) {
@@ -22,27 +21,28 @@ export class AuthService {
   }
 
   // --- Registration Flow ---
-
   initiateSignup(data: InitiateSignupRequest): Observable<AuthResponse> {
-    return from(axios.post<AuthResponse>(`${this.apiUrl}/initiate-signup`, data).then(res => res.data));
+    return from(api.post<AuthResponse>(`/auth/initiate-signup`, data).then(res => res.data));
   }
 
   verifyEmail(data: VerifyEmailRequest): Observable<AuthResponse> {
-    return from(axios.post<AuthResponse>(`${this.apiUrl}/verify-email`, data).then(res => res.data));
+    return from(api.post<AuthResponse>(`/auth/verify-email`, data).then(res => res.data));
   }
 
   completeSignup(data: SignupRequest): Observable<AuthResponse> {
-    return from(axios.post<AuthResponse>(`${this.apiUrl}/signup`, data).then(res => res.data));
+    return from(api.post<AuthResponse>(`/auth/signup`, data).then(res => res.data));
   }
 
   // --- Login Flow ---
-
   login(data: LoginRequest): Observable<AuthResponse> {
-    return from(axios.post<AuthResponse>(`${this.apiUrl}/login`, data).then(res => res.data))
+    return from(api.post<AuthResponse>(`/auth/login`, data).then(res => res.data))
       .pipe(
         tap(response => {
           if (this.isBrowser && response.accessToken && response.refreshToken) {
             this.setTokens(response.accessToken, response.refreshToken);
+            if (response.user) {
+              localStorage.setItem('user', JSON.stringify(response.user));
+            }
           }
         })
       );
@@ -52,11 +52,33 @@ export class AuthService {
     if (this.isBrowser) {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
     }
   }
 
-  // --- Token Management ---
+  // --- New Methods ---
+  getCurrentUser(): Observable<any> {
+    if (!this.getAccessToken()) return of(null);
+    if (this.isBrowser) {
+      const localUser = localStorage.getItem('user');
+      if (localUser) {
+        try {
+          return of(JSON.parse(localUser));
+        } catch (e) {}
+      }
+    }
+    return from(api.get(`/auth/me`).then(res => res.data));
+  }
 
+  forgotPassword(email: string): Observable<any> {
+    return from(api.post(`/auth/forgot-password`, { email }).then(res => res.data));
+  }
+
+  resetPassword(data: { email: string; otpCode: string; newPassword: string }): Observable<any> {
+    return from(api.post(`/auth/reset-password`, data).then(res => res.data));
+  }
+
+  // --- Token Management ---
   private setTokens(accessToken: string, refreshToken: string): void {
     localStorage.setItem('accessToken', accessToken);
     localStorage.setItem('refreshToken', refreshToken);

@@ -4,7 +4,7 @@ import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DoctorService } from '../../../core/services/doctor.service';
 import { AppointmentService } from '../../../core/services/appointment.service';
-import { Doctor, Appointment, Specialization, DoctorCreateRequest } from '../../../core/models/api.model';
+import { Doctor, Appointment, Specialization, DoctorCreateRequest, AvailabilitySlot, CreateAvailabilityRequest } from '../../../core/models/api.model';
 import { AuthService } from '../../../core/auth/auth.service';
 
 @Component({
@@ -113,12 +113,79 @@ import { AuthService } from '../../../core/auth/auth.service';
                                     <td>{{ doc.city }}</td>
                                     <td>⭐ {{ doc.rating }}</td>
                                     <td class="text-right flex-end gap-2">
+                                        <button class="btn-sm btn-outline-success" (click)="manageSchedule(doc)">Schedule</button>
                                         <button class="btn-sm btn-outline-info" (click)="editDoctor(doc)">Edit</button>
                                         <button class="btn-sm btn-outline-danger" (click)="deleteDoctor(doc.doctorId)">Delete</button>
                                     </td>
                                 </tr>
                                 <tr *ngIf="doctors.length === 0">
                                     <td colspan="6" class="text-center py-8 text-muted">No doctors found in system.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Doctor Availability Tab -->
+            <div *ngIf="activeTab === 'availability'" class="fade-in">
+                <button class="btn btn-outline-light mb-4" (click)="activeTab = 'doctors'">← Back to Doctors</button>
+                <div class="glass-panel p-6 mb-8 form-container border border-dark" *ngIf="selectedDoctorForSchedule">
+                    <h3 class="text-xl font-bold mb-2">Manage Schedule: {{ selectedDoctorForSchedule.name }}</h3>
+                    <p class="text-muted mb-4">Set the weekly availability for this doctor.</p>
+                    
+                    <form (submit)="submitAvailability($event)" class="grid grid-2 gap-4 items-end">
+                        <div>
+                            <label class="form-label">Day of Week</label>
+                            <select [(ngModel)]="availForm.dayOfWeek" name="dayOfWeek" class="form-input-dark">
+                                <option [ngValue]="1">Monday</option>
+                                <option [ngValue]="2">Tuesday</option>
+                                <option [ngValue]="3">Wednesday</option>
+                                <option [ngValue]="4">Thursday</option>
+                                <option [ngValue]="5">Friday</option>
+                                <option [ngValue]="6">Saturday</option>
+                                <option [ngValue]="0">Sunday</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="form-label">Start Time</label>
+                            <input type="time" [(ngModel)]="availForm.startTime" name="startTime" class="form-input-dark" required>
+                        </div>
+                        <div>
+                            <label class="form-label">End Time</label>
+                            <input type="time" [(ngModel)]="availForm.endTime" name="endTime" class="form-input-dark" required>
+                        </div>
+                        <div>
+                            <label class="form-label">Slot Duration (Mins)</label>
+                            <input type="number" [(ngModel)]="availForm.slotDurationMinutes" name="duration" class="form-input-dark" required min="5" step="5">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Set Availability</button>
+                    </form>
+                </div>
+
+                <div class="glass-panel p-6" *ngIf="selectedDoctorForSchedule">
+                    <h3 class="mb-4 text-xl font-bold">Current Weekly Schedule</h3>
+                    <div class="table-responsive">
+                        <table class="data-table-dark w-full">
+                            <thead>
+                                <tr>
+                                    <th>Day</th>
+                                    <th>Time Range</th>
+                                    <th>Slot Duration</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr *ngFor="let slot of doctorAvailability" class="hover-bg-dark">
+                                    <td class="font-medium">{{ slot.dayName }}</td>
+                                    <td>{{ formatTime(slot.startTime) }} - {{ formatTime(slot.endTime) }}</td>
+                                    <td>{{ slot.slotDurationMinutes }} mins</td>
+                                    <td>
+                                        <button class="btn-sm btn-outline-danger" (click)="deleteAvailability(slot.dayOfWeek)">Clear Day</button>
+                                    </td>
+                                </tr>
+                                <tr *ngIf="doctorAvailability.length === 0">
+                                    <td colspan="4" class="text-center py-8 text-muted">No schedule defined. Doctor is unavailable.</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -139,7 +206,8 @@ import { AuthService } from '../../../core/auth/auth.service';
                                     <th>Date</th>
                                     <th>Time</th>
                                     <th>Status</th>
-                                    <th>Action</th>
+                                    <th>Patient Action</th>
+                                    <th>Admin Action</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -149,17 +217,22 @@ import { AuthService } from '../../../core/auth/auth.service';
                                     <td>{{ appt.appointmentDate | date:'mediumDate' }}</td>
                                     <td>{{ appt.timeSlot }}</td>
                                     <td>
-                                        <select class="status-select bg-darker text-sm" 
-                                                [(ngModel)]="appt.status" 
-                                                (change)="updateStatus(appt)">
-                                            <option value="Pending">Pending</option>
-                                            <option value="Confirmed">Confirmed</option>
-                                            <option value="Completed">Completed</option>
-                                            <option value="Cancelled">Cancelled</option>
-                                        </select>
+                                        <span class="badge" [ngClass]="{
+                                            'badge-pending': appt.status === 'Pending',
+                                            'badge-confirmed': appt.status === 'Confirmed',
+                                            'badge-completed': appt.status === 'Completed',
+                                            'badge-cancelled': appt.status === 'Cancelled'
+                                        }">{{ appt.status }}</span>
                                     </td>
                                     <td>
-                                        <button class="btn-sm btn-outline-danger" (click)="adminCancelAppointment(appt.appointmentId)">Delete</button>
+                                        <div class="flex gap-2" *ngIf="appt.status === 'Pending'">
+                                            <button class="btn-sm btn-outline-success" (click)="updateStatus(appt, 'Confirmed')">Accept</button>
+                                            <button class="btn-sm btn-outline-danger" (click)="updateStatus(appt, 'Cancelled')">Reject</button>
+                                        </div>
+                                        <span *ngIf="appt.status !== 'Pending'" class="text-muted text-sm">—</span>
+                                    </td>
+                                    <td>
+                                        <button class="btn-sm btn-outline-danger" (click)="adminCancelAppointment(appt.appointmentId)">Delete Record</button>
                                     </td>
                                 </tr>
                                 <tr *ngIf="appointments.length === 0">
@@ -255,7 +328,16 @@ import { AuthService } from '../../../core/auth/auth.service';
     .btn-outline-danger:hover { background: #ef4444; color: white; }
     .btn-outline-info { color: #38bdf8; border-color: rgba(56,189,248,0.3); background: rgba(56,189,248,0.05); }
     .btn-outline-info:hover { background: #0ea5e9; color: white; }
+    .btn-outline-success { color: #34d399; border-color: rgba(52, 211, 153, 0.3); background: rgba(52, 211, 153, 0.05); }
+    .btn-outline-success:hover { background: #10b981; color: white; }
     .hover-danger:hover { background: #ef4444; color: white; border-color: #ef4444; }
+
+    /* Badges */
+    .badge { display: inline-block; padding: 0.25rem 0.6rem; border-radius: 999px; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+    .badge-pending   { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .badge-confirmed { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .badge-completed { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
+    .badge-cancelled { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
 
     /* Forms */
     .form-container { background: rgba(15, 23, 42, 0.3); }
@@ -275,11 +357,21 @@ import { AuthService } from '../../../core/auth/auth.service';
   `]
 })
 export class AdminHomeComponent implements OnInit {
-  activeTab: 'dashboard' | 'doctors' | 'appointments' = 'dashboard';
+  activeTab: 'dashboard' | 'doctors' | 'appointments' | 'availability' = 'dashboard';
   
   doctors: Doctor[] = [];
   appointments: Appointment[] = [];
   specializations: Specialization[] = [];
+
+  // Availability state
+  selectedDoctorForSchedule: Doctor | null = null;
+  doctorAvailability: AvailabilitySlot[] = [];
+  availForm: CreateAvailabilityRequest = {
+      dayOfWeek: 1,
+      startTime: '09:00',
+      endTime: '17:00',
+      slotDurationMinutes: 30
+  };
 
   // Form State
   editMode = false;
@@ -409,18 +501,77 @@ export class AdminHomeComponent implements OnInit {
       };
   }
 
+  // --- Availability Management ---
+
+  manageSchedule(doc: Doctor) {
+      this.selectedDoctorForSchedule = doc;
+      this.activeTab = 'availability';
+      this.loadAvailability(doc.doctorId);
+  }
+
+  loadAvailability(doctorId: number) {
+      this.doctorService.getAvailability(doctorId).subscribe({
+          next: (res) => this.doctorAvailability = res || [],
+          error: (err) => console.error(err)
+      });
+  }
+
+  submitAvailability(event: Event) {
+      event.preventDefault();
+      if (!this.selectedDoctorForSchedule) return;
+
+      // Ensure seconds are attached for TimeSpan on backend if required
+      const formatTime = (t: string) => t.length === 5 ? t + ':00' : t;
+      const payload: CreateAvailabilityRequest = {
+          ...this.availForm,
+          startTime: formatTime(this.availForm.startTime),
+          endTime: formatTime(this.availForm.endTime)
+      };
+
+      this.doctorService.setAvailability(this.selectedDoctorForSchedule.doctorId, payload).subscribe({
+          next: () => {
+              this.loadAvailability(this.selectedDoctorForSchedule!.doctorId);
+              alert('Schedule updated successfully');
+          },
+          error: (err) => {
+              console.error(err);
+              alert('Failed to update schedule.');
+          }
+      });
+  }
+
+  deleteAvailability(dayOfWeek: number) {
+      if (!this.selectedDoctorForSchedule) return;
+      if (confirm('Clear schedule for this day?')) {
+          this.doctorService.deleteAvailability(this.selectedDoctorForSchedule.doctorId, dayOfWeek).subscribe({
+              next: () => this.loadAvailability(this.selectedDoctorForSchedule!.doctorId),
+              error: (err) => console.error(err)
+          });
+      }
+  }
+
+  formatTime(t: string): string {
+      if (!t) return '';
+      const [h, m] = t.split(':');
+      let hr = parseInt(h);
+      if(isNaN(hr)) return t;
+      const ampm = hr >= 12 ? 'PM' : 'AM';
+      hr = hr % 12 || 12;
+      return `${hr}:${m} ${ampm}`;
+  }
+
   // --- Appointment Management ---
 
-  updateStatus(appt: Appointment) {
-       this.appointmentService.updateAppointmentStatus(appt.appointmentId, { status: appt.status }).subscribe({
+  updateStatus(appt: Appointment, newStatus: string) {
+       if(!confirm(`Are you sure you want to mark this appointment as ${newStatus}?`)) return;
+
+       this.appointmentService.updateAppointmentStatus(appt.appointmentId, { status: newStatus }).subscribe({
            next: () => {
-               // Silently update success, no alert needed for slick UX
-               console.log('Status updated to', appt.status);
+               appt.status = newStatus;
            },
            error: (err) => {
                console.error(err);
                alert('Failed to update status.');
-               this.loadAppointments(); // revert
            }
        });
   }

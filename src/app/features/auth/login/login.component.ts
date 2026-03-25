@@ -183,9 +183,9 @@ export class LoginComponent {
               if (res.refreshToken) localStorage.setItem('refreshToken', res.refreshToken);
               if (res.user) localStorage.setItem('user', JSON.stringify(res.user));
 
-              // Route based on role from API response
-              const role = res.user?.role || 'User';
-              if (role === 'Admin') {
+              // Route based on role from API response (case-insensitive)
+              const role = (res.user?.role || 'User').toLowerCase();
+              if (role === 'admin') {
                   this.router.navigate(['/admin/dashboard']);
               } else {
                   this.router.navigate(['/patient/dashboard']);
